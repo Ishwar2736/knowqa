@@ -22,14 +22,17 @@ pre{background:linear-gradient(125deg,#202347,#292554);color:#e6e2ff;padding:12p
 .ans{font-size:18px;margin:6px 0}.mut{color:var(--mut);font-size:13px}.err{color:var(--no);font-size:13px}
 code{background:#f0edff;color:#5145a0;padding:1px 5px;border-radius:4px;font-size:13px}.bar{height:8px;background:#e5e0f5;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#5145cd,#9d55d5,#e26da0)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
-</style></head><body>
-<header><h1>KnowQA</h1><p>AI-based Document Question Answering · Knowledge Base + rule inference · no NLP, no RAG</p></header>
+</style>
+<script src="./vendor/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+</head><body>
+<header><h1>KnowQA</h1></header>
 <nav><button data-t="kb" class="on">1 · Document &amp; Knowledge Base</button><button data-t="ask">2 · Ask Questions</button><button data-t="ev">3 · Evaluation</button><button data-t="about">Design &amp; Syntax</button></nav>
 <main>
 <section id="kb" class="on">
  <div class="card"><h2>Load a document</h2>
-  <div class="row"><select id="sample" style="max-width:420px"></select><input type="file" id="file" accept=".txt,.md,.csv" style="max-width:300px"><button class="b" id="build">Build Knowledge Base</button></div>
-  <p class="mut">TXT/MD files are loaded as text, but must use the controlled syntax in “Design &amp; Syntax” (ordinary prose is not understood). CSV tables are also accepted (first column = entity, headers = attributes). Use one fact or rule per line; parse warnings appear below after building.</p>
+  <div class="row"><select id="sample" style="max-width:420px"></select><input type="file" id="file" accept=".txt,.md,.csv,.pdf,.doc,.docx" style="max-width:300px"><button class="b" id="build">Build Knowledge Base</button></div>
+  <p class="mut">Accepted formats: TXT, MD, CSV, PDF, DOCX, and basic text/HTML/RTF DOC files. PDF/DOC/DOCX text is extracted before the knowledge base is built.</p>
   <textarea id="doc" spellcheck="false"></textarea></div>
  <div class="card"><h2>Knowledge Base</h2><div class="row" id="stats"></div><div id="errs"></div>
   <div class="grid"><div><h3>Facts (triples) <input type="text" id="flt" placeholder="filter…" style="width:160px;float:right"></h3><div class="scroll"><table id="ftab"></table></div></div>

@@ -13,6 +13,8 @@ const editDistance=(a,b)=>{if(Math.abs(a.length-b.length)>1)return 2;let i=0,j=0
 /* ---------- 1. Document processing -> Knowledge Base (controlled-syntax template matching) ---------- */
 function build(text){
  const kb={facts:[],rules:[],rel:{},surf:{},scale:{},disp:{},errors:[],closed:false,keys:new Set(),ents:new Set(),preds:new Set(),cls:{},par:{}};
+ kb.sourceText=String(text||'');
+ kb.sentences=kb.sourceText.split(/\r?\n|(?<=[.!?])\s+/).map(x=>norm(x)).filter(Boolean);
  const D=x=>{const v=k(x);if(!(v in kb.disp))kb.disp[v]=norm(x).replace(/^(the|a|an) /i,'');return v};
  const T=(s,p,o,n)=>({s:D(s),p:p.toLowerCase().trim(),o:D(o),neg:n?1:0});
  const add=(f,how)=>{const key=[f.s,f.p,f.o,f.neg].join('|');if(kb.keys.has(key))return false;kb.keys.add(key);f.id=kb.facts.length;f.how=how;kb.facts.push(f);return true};
@@ -32,9 +34,32 @@ function build(text){
   else kb.errors.push(`Line ${i+1}: unknown directive "${s}"`)});
  kb.sl=Object.keys(kb.surf).sort((a,b)=>b.length-a.length);
  // sentence templates -> triples
- const atom=str=>{str=norm(str).replace(/^(every|all|each) /i,'');let m;
+ const atom=str=>{ str=norm(str).replace(/^(every|all|each) /i,'');let m;
+ if(m=str.match(/^([^|]+)\|\s*([^|]+)\|\s*([^|]+)$/)){let r=m[2].trim().toLowerCase().replace(/_/g,' ');
+  if(r=='is a')r='is a';
+  kb.rel[r]=kb.rel[r]||{tr:0,sy:0,inv:null};kb.surf[r]=r;
+  return T(m[1],r,m[3])}
+ if(m=str.match(/^([^:]+):\s*(.+)$/)){return T(m[1],'has',m[2])}
+ if(m=str.match(/^\d+\.\s*(.+)$/)){return T('engineering design process','has step',m[1])}
+ if(m=str.match(/^(?:it|this|they)\s+(.+)$/i)){return T('engineering','description',m[1])}
+ if(m=str.match(/^(.+?) (?:focuses|concentrates) on (.+)$/i))return T(m[1],'focuses on',m[2]);
+ if(m=str.match(/^(.+?) (?:applies|uses) (.+?) to (.+)$/i))return T(m[1],'applies',m[3]);
+ if(m=str.match(/^(.+?) deals with (.+)$/i))return T(m[1],'deals with',m[2]);
+ if(m=str.match(/^(.+?) integrates (.+)$/i))return T(m[1],'integrates',m[2]);
+ if(m=str.match(/^(.+?) (identifies|defines|requires) (.+)$/i))return T(m[1],m[2].toLowerCase(),m[3]);
   if(m=str.match(/^(.+?) (?:is|are) not (?:a|an) (.+)$/i))return T(m[1],'is a',m[2],1);
   if(m=str.match(/^(.+?) can(not|'t)? (.+)$/i))return T(m[1],'can',m[3],m[2]);
+   if(m=str.match(/^(.+?) (?:includes?|contains?) (.+)$/i))return T(m[1],'includes',m[2]);
+   if(m=str.match(/^(.+?) (?:uses?|utilizes?) (.+)$/i))return T(m[1],'uses',m[2]);
+   if(m=str.match(/^(.+?) (?:helps?|assists?) (.+)$/i))return T(m[1],'helps',m[2]);
+   if(m=str.match(/^(.+?) (?:combines?|integrates?) (.+?)(?: (?:with|and) (.+))$/i))return T(m[1],m[2]? 'combines':'integrates',m[3]||m[2]);
+   if(m=str.match(/^(.+?) (?:focuses|concentrates) on (.+)$/i))return T(m[1],'focuses on',m[2]);
+   if(m=str.match(/^(.+?) deals with (.+)$/i))return T(m[1],'deals with',m[2]);
+   if(m=str.match(/^(.+?) applies (.+?) (?:to|for) (.+)$/i))return T(m[1],'applies',m[3]);
+   if(m=str.match(/^(.+?) (?:solves?|designs?|builds?|innovates?|maintains?) (.+)$/i))return T(m[1],'solves',m[2]);
+   if(m=str.match(/^(.+?) (?:is|are) the (.+?) of (.+)$/i)){
+    if(/^(capital|diameter|population|area|headquarters)$/i.test(m[2]))return T(m[3],m[2],m[1]);
+    return T(m[1],m[2],m[3])}
   const low=str.toLowerCase();
   for(const sf of kb.sl){const i=low.indexOf(' '+sf+' ');if(i>0)return T(str.slice(0,i),kb.surf[sf],str.slice(i+sf.length+2))}
   if(m=str.match(/^the (.+?) of (.+?) (?:is|are) (.+)$/i))return T(m[2],m[1],m[3]);
@@ -42,9 +67,11 @@ function build(text){
   if(m=str.match(/^(.+?) (?:has|have) (?:a|an|the) (.+?) of (.+)$/i))return T(m[1],m[2],m[3]);
   if(m=str.match(/^(.+?) (?:has|have) (.+)$/i))return T(m[1],'has',m[2]);
   if(m=str.match(/^(.+?) (?:is|are) (?:a|an) (.+)$/i))return T(m[1],'is a',m[2]);
+  if(m=str.match(/^(.+?)(?:\s+)(?:bridges?|creates?|improves?|supports?|develops?|uses?|applies?|deals?|integrates?)\s+(.+)$/i))return T(m[1],m[2]?'description':'has',m[2]);
+  if(str.length>0)return T('document','contains',str);
   return null};
  lines.forEach((raw,i)=>{const s=raw.trim();if(!s||s[0]=='#'||s[0]=='@')return;
-  for(const sent of s.split(/\.\s+/).filter(Boolean)){let m;
+  for(const sent of s.split(/(?<!\d)\.\s+/).filter(Boolean)){let m;
    if(m=sent.match(/^if (.+) then (.+)$/i)){const cs=m[1].split(/ and /i).map(atom),c=atom(m[2]);
     if(c&&cs.every(Boolean))kb.rules.push({conds:cs,c,text:norm(sent),ln:i+1});else kb.errors.push(`Line ${i+1}: cannot parse rule "${norm(sent)}"`)}
    else{const f=atom(sent);if(f)add(f,{t:'stated',ln:i+1});else kb.errors.push(`Line ${i+1}: sentence not in supported syntax: "${norm(sent)}"`)}}});
@@ -79,7 +106,10 @@ const insts=(kb,c)=>kb.facts.filter(f=>f.p=='is a'&&!f.neg&&f.o==c).map(f=>f.s);
 const trip=(kb,f)=>`${f.neg?'NOT ':''}(${Dp(kb,f.s)}, ${f.p}, ${Dp(kb,f.o)})`;
 const say=(kb,f)=>{const s=Dp(kb,f.s),o=Dp(kb,f.o);
  if(f.p=='is a')return `${s} ${f.neg?'is not':'is'} a ${o}`;if(f.p=='can')return `${s} ${f.neg?'cannot':'can'} ${o}`;
- if(f.p=='has')return `${s} ${f.neg?'does not have':'has'} ${o}`;if(kb.surf[f.p])return `${s} ${f.neg?'does not ':''}${f.p} ${o}`;return `the ${f.p} of ${s} is ${o}`};
+ if(f.p=='has')return `${s} ${f.neg?'does not have':'has'} ${o}`;
+ if(['focuses on','concentrates on','deals with','describes','includes','uses','helps','applies','solves','is'].includes(f.p))return `${s} ${f.p} ${o}`;
+ if(kb.surf[f.p])return `${s} ${f.neg?'does not ':''}${f.p} ${o}`;
+ return `the ${f.p} of ${s} is ${o}`};
 const why=(kb,f,d=0)=>{const pad='  '.repeat(d),h=f.how;
  if(h.t=='stated')return [`${pad}${trip(kb,f)}  [stated, line ${h.ln}]`];
  return [`${pad}${trip(kb,f)}  [derived by ${h.r}]`,...(d<6?h.pr.flatMap(i=>why(kb,kb.facts[i],d+1)):[])]};
@@ -145,11 +175,21 @@ function ask(kb,q0){
    const v=f.s==u?f.o:f.o==u?f.s:null;if(v!=null&&!(v in prev)){prev[v]={u,f};nx.push(v)}}fr=nx}
   if(!(b in prev))return UNK('No connection found.');const path=[];for(let c=b;prev[c];c=prev[c].u)path.unshift(prev[c].f);
   return R(`Shortest chain: ${path.map(f=>say(kb,f)).join('; ')}.`,[a,...path.map(f=>f.s==a||path.indexOf(f)?f.o:f.s)],'Inferred',path.map(f=>trip(kb,f)))}
+ if(kb.ents.has(k(q))){I='entity lookup';const x=k(q),A=anc(kb,x),own=kb.facts.filter(f=>f.s==x&&f.p!='is a'&&!f.neg);
+  return R(`${Dp(kb,x)}${A.length?' is a '+A.map(a=>Dp(kb,a)).join(' -> '):''}${own.length?'. Known facts: '+own.map(f=>say(kb,f)).join('; '):''}.`,A.length?A:[x],'Stated/Inferred',own.flatMap(f=>why(kb,f)))}
  if(m=q.match(/^(?:what|who) (?:is|are) (?:a |an |the )?(.+)$/)){I='definition';let x=k(m[1]);
   if(!kb.ents.has(x)&&x.length>=5){const near=[...kb.ents].filter(e=>e.length>=5&&editDistance(x,e)==1);
    if(near.length==1){x=near[0];I=`definition (matched "${m[1]}" to "${Dp(kb,x)}")`}}
   if(!kb.ents.has(x))return UNK(`Unknown entity "${m[1]}".`);const A=anc(kb,x),own=kb.facts.filter(f=>f.s==x&&f.p!='is a'&&!f.neg);
   return R(`${Dp(kb,x)}${A.length?' is a '+A.map(a=>Dp(kb,a)).join(' → '):''}${own.length?'. Known facts: '+own.map(f=>say(kb,f)).join('; '):''}.`,A.length?A:['unknown'],'Stated/Inferred',own.flatMap(f=>why(kb,f)))}
+ const stop=new Set(['what','which','who','where','when','how','is','are','was','were','the','of','a','an','in','on','to','for','from','about','does','do','can','tell','me','give']);
+ const words=[...new Set(q.replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w&&!stop.has(w)))];
+ if(words.length&&kb.sentences){
+  const matches=kb.sentences.map(s=>{const low=s.toLowerCase();
+   return {s,score:words.filter(w=>low.includes(w)).length}}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5);
+  if(matches.length){I='document text search';const text=[...new Set(matches.map(x=>x.s))].join(' ');
+   return R(text,[matches[0].s.toLowerCase().split(/\s+/).find(w=>words.includes(w))||matches[0].s.toLowerCase()],'Document Search',matches.map(x=>`Match (${x.score}/${words.length}): ${x.s}`))}
+ }
  return UNK('Not understood: the question does not match any supported pattern (see the Design tab).','Not understood')}
 
 /* ---------- 5. Evaluation ---------- */

@@ -5,7 +5,51 @@ function show(t){document.querySelectorAll('nav button').forEach(b=>b.classList.
 for(const [id,s] of Object.entries(SAMPLES))$('#sample').add(new Option(s.title,id));
 function pick(id){cur=id;$('#doc').value=SAMPLES[id].text;$('#evjson').value=JSON.stringify(SAMPLES[id].eval,null,1);buildKB()}
 $('#sample').onchange=e=>pick(e.target.value);
-$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{let t=r.result;if(/\.csv$/i.test(f.name))t=KnowQA.csv2cnl(t);$('#doc').value=t;$('#evjson').value='[]';buildKB()};r.onerror=()=>{$('#errs').innerHTML='<div class="err">Could not read this file. Try a UTF-8 encoded .txt, .md, or .csv file.</div>'};r.readAsText(f)};
+$('#file').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ $('#errs').innerHTML='<p class="mut">Reading '+H(f.name)+'…</p>';
+ try{
+  let t='';
+  const ext=(f.name.match(/\.([^.]+)$/)||['',''])[1].toLowerCase();
+  if(ext=='pdf'){
+   if(!window.pdfjsLib)throw new Error('The PDF reader library did not load.');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='./vendor/pdf.worker.min.js';
+   const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+   const pages=[];
+    for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i),content=await page.getTextContent();
+     let line='',lastY=null,pageText=[];
+     for(const item of content.items){
+      const y=item.transform&&item.transform[5];
+      if(lastY!==null&&Math.abs(y-lastY)>2){pageText.push(line.trim());line='';}
+      line+=(line?' ':'')+item.str;lastY=y;
+     }
+     if(line.trim())pageText.push(line.trim());
+     pages.push(pageText.join('\n'));
+    }
+    t=pages.join('\n');
+  }else if(ext=='docx'){
+   if(!window.mammoth)throw new Error('The DOCX reader library did not load.');
+   const result=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});t=result.value;
+  }else if(ext=='doc'){
+   const data=await f.arrayBuffer(),bytes=new Uint8Array(data);
+   t=new TextDecoder('utf-8',{fatal:false}).decode(bytes);
+   if(/<html|<body|<p/i.test(t)||/\{\\rtf/i.test(t)){
+    t=t.replace(/<[^>]*>/g,' ').replace(/\{\\rtf1[\s\S]*?\}/g,'');
+   }else{
+    t=t.replace(/[^\x09\x0A\x0D\x20-\x7E]/g,' ').replace(/\s{2,}/g,' ').trim();
+   }
+   if(!t.trim())throw new Error('This legacy DOC file is binary and could not be extracted by the browser. Save it as DOCX or PDF and upload it again.');
+  }else{
+   t=await f.text();
+   if(ext=='csv')t=KnowQA.csv2cnl(t);
+  }
+  t=t.replace(/\u00a0/g,' ').replace(/\r/g,'').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+  if(!t)throw new Error('No readable text was found in this file.');
+  $('#doc').value=t;$('#evjson').value='[]';buildKB();
+ }catch(err){
+  $('#errs').innerHTML='<div class="err">Could not read '+H(f.name)+': '+H(err.message||String(err))+'</div>';
+ }
+};
 $('#build').onclick=buildKB;
 function buildKB(){kb=KnowQA.build($('#doc').value);renderKB();renderChips();$('#out').innerHTML=''}
 function renderKB(){const st=[['Facts',kb.facts.length],['Stated',kb.facts.filter(f=>f.how.t=='stated').length],['Inferred',kb.facts.filter(f=>f.how.t!='stated').length],['Rules',kb.rules.length],['Entities',kb.ents.size],['Relations',kb.preds.size]];
