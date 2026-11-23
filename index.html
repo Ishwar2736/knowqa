@@ -1,0 +1,76 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KnowQA – Knowledge-Base Document Question Answering</title>
+<style>
+:root{--bg:#f7f5ff;--card:#fff;--ink:#20213a;--mut:#656780;--pri:#5145cd;--ok:#147a58;--no:#bd3450;--unk:#9b6200;--line:#e5def5}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,Segoe UI,sans-serif;background:linear-gradient(135deg,#f7f5ff 0%,#f1f8ff 55%,#fff5fb 100%);color:var(--ink)}
+header{background:linear-gradient(115deg,#263780 0%,#5145cd 55%,#9846a8 100%);color:#fff;padding:25px 5vw;box-shadow:0 4px 18px #37318a30}header h1{margin:0;font-size:28px;letter-spacing:.3px}header p{margin:4px 0 0;opacity:.9}
+nav{display:flex;gap:4px;padding:0 5vw;background:#ffffffed;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;box-shadow:0 3px 12px #29264a0c}
+nav button{border:0;background:none;padding:13px 16px;font:inherit;cursor:pointer;color:var(--mut);border-bottom:3px solid transparent;transition:color .18s,background .18s}nav button:hover{color:var(--pri);background:#f4f1ff}nav button.on{color:var(--pri);border-color:#7659e8;font-weight:600;background:linear-gradient(180deg,#fff,#f4f0ff)}
+main{padding:20px 5vw;max-width:1200px;margin:auto}section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px;margin-bottom:16px;box-shadow:0 5px 18px #423b7810;transition:box-shadow .18s,border-color .18s}.card:hover{border-color:#d5c9f3;box-shadow:0 8px 24px #423b7818}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}h2{margin:0 0 10px;font-size:18px}h3{margin:14px 0 6px;font-size:15px}
+textarea,input[type=text],select{width:100%;font:inherit;padding:9px;border:1px solid #d5d1e6;border-radius:8px;background:#fff;color:var(--ink);transition:border-color .18s,box-shadow .18s}textarea:focus,input[type=text]:focus,select:focus{outline:none;border-color:#7161e8;box-shadow:0 0 0 3px #7161e825}
+textarea{min-height:230px;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+button.b{background:linear-gradient(110deg,#5145cd,#7355df);color:#fff;border:0;padding:9px 16px;border-radius:8px;font:inherit;cursor:pointer;box-shadow:0 3px 8px #5145cd30;transition:filter .18s,transform .18s}button.b:hover{filter:brightness(1.08);transform:translateY(-1px)}button.b:focus-visible,.chip:focus-visible,nav button:focus-visible{outline:3px solid #ffbd59;outline-offset:2px}button.b.alt{background:#eeeaff;color:#5145cd;box-shadow:none}
+.chip{border:1px solid #e0daf4;background:linear-gradient(135deg,#fff,#f7f3ff);color:#49427f;border-radius:99px;padding:4px 11px;font-size:13px;cursor:pointer;transition:all .18s}.chip:hover{border-color:#8b73e6;background:#eeeaff;color:#3f34aa;transform:translateY(-1px)}
+.stat{flex:1;min-width:110px;background:linear-gradient(135deg,#f1efff,#f7f4ff);border:1px solid #e4defa;border-radius:10px;padding:10px;text-align:center}.stat:nth-child(3n+2){background:linear-gradient(135deg,#ebf8ff,#f2faff);border-color:#d9eef8}.stat:nth-child(3n){background:linear-gradient(135deg,#fff1f7,#fff7fa);border-color:#f6dfea}.stat b{display:block;font-size:22px;color:var(--pri)}.stat:nth-child(3n+2) b{color:#1680a5}.stat:nth-child(3n) b{color:#b34380}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f0edff;color:#413c78;position:sticky;top:0}tbody tr:nth-child(even){background:#fbfaff}
+.scroll{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;background:#ece9ff;color:#5145cd}
+.yes{color:var(--ok)}.no{color:var(--no)}.unk{color:var(--unk)}
+pre{background:linear-gradient(125deg,#202347,#292554);color:#e6e2ff;padding:12px;border-radius:8px;overflow:auto;font-size:12.5px;white-space:pre-wrap;margin:6px 0}
+.ans{font-size:18px;margin:6px 0}.mut{color:var(--mut);font-size:13px}.err{color:var(--no);font-size:13px}
+code{background:#f0edff;color:#5145a0;padding:1px 5px;border-radius:4px;font-size:13px}.bar{height:8px;background:#e5e0f5;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#5145cd,#9d55d5,#e26da0)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+</style></head><body>
+<header><h1>KnowQA</h1><p>AI-based Document Question Answering · Knowledge Base + rule inference · no NLP, no RAG</p></header>
+<nav><button data-t="kb" class="on">1 · Document &amp; Knowledge Base</button><button data-t="ask">2 · Ask Questions</button><button data-t="ev">3 · Evaluation</button><button data-t="about">Design &amp; Syntax</button></nav>
+<main>
+<section id="kb" class="on">
+ <div class="card"><h2>Load a document</h2>
+  <div class="row"><select id="sample" style="max-width:420px"></select><input type="file" id="file" accept=".txt,.md,.csv" style="max-width:300px"><button class="b" id="build">Build Knowledge Base</button></div>
+  <p class="mut">TXT/MD files are loaded as text, but must use the controlled syntax in “Design &amp; Syntax” (ordinary prose is not understood). CSV tables are also accepted (first column = entity, headers = attributes). Use one fact or rule per line; parse warnings appear below after building.</p>
+  <textarea id="doc" spellcheck="false"></textarea></div>
+ <div class="card"><h2>Knowledge Base</h2><div class="row" id="stats"></div><div id="errs"></div>
+  <div class="grid"><div><h3>Facts (triples) <input type="text" id="flt" placeholder="filter…" style="width:160px;float:right"></h3><div class="scroll"><table id="ftab"></table></div></div>
+  <div><h3>Rules &amp; declarations</h3><div class="scroll" id="rules" style="padding:8px"></div></div></div></div>
+</section>
+<section id="ask"><div class="card"><h2>Ask a question</h2>
+ <div class="row"><input type="text" id="q" placeholder="e.g. Can Tweety fly?" style="flex:1"><button class="b" id="go">Ask</button></div>
+ <div class="row" id="chips" style="margin-top:10px"></div></div><div id="out"></div></section>
+<section id="ev"><div class="card"><h2>Evaluate the system</h2>
+ <p class="mut">Each test is <code>{"q": question, "a": [expected answers]}</code>. Answers are compared as sets; <code>yes</code>/<code>no</code>/<code>unknown</code> are used for yes/no and unanswerable questions. Edit the JSON to test your own document.</p>
+ <textarea id="evjson" style="min-height:150px"></textarea><div class="row" style="margin-top:10px"><button class="b" id="run">Run evaluation</button><button class="b alt" id="dl">Download results (CSV)</button></div></div><div id="evout"></div></section>
+<section id="about">
+ <div class="card"><h2>Chosen AI techniques &amp; justification</h2>
+  <p><b>Knowledge representation:</b> a <i>semantic network of (subject, relation, object) triples</i> with explicit negation, plus <i>if–then rules</i> (Horn-style, with variables). <b>Inference:</b> <i>forward chaining</i> to a fixpoint (transitivity, symmetry, inverse relations, user rules) and <i>default inheritance with exceptions</i> over the is-a hierarchy (nearest ancestor wins, so “penguins cannot fly” overrides “birds can fly”). <b>Search:</b> breadth-first search for the nearest inheriting ancestor, for “how is X related to Y”, and exhaustive search for superlatives.</p>
+  <p><b>Why not NLP / RAG?</b> The brief forbids them. This system uses no tokenisation pipelines, stemming, tagging, embeddings, TF-IDF, language models or retrieval-and-generate. Text is mapped to triples by exact template matching on a <i>controlled syntax</i>, and questions are matched to a fixed set of <i>question templates</i>; answers are produced from the symbolic result with answer templates. Symbolic reasoning gives <b>explainable, verifiable</b> answers: every answer carries a proof tree, and the system answers “Unknown” instead of guessing.</p>
+  <p><b>Limitations:</b> the document must follow the controlled syntax; questions must fit a supported pattern; conflicting facts at the same inheritance level are not resolved.</p></div>
+ <div class="card"><h2>Pipeline</h2><pre>Document ─► line/sentence template matching ─► triples + rules ─► forward chaining (closure) ─► Knowledge Base
+Question ─► question-template matching ─► query (lookup / inherit / search / compare) ─► answer + proof tree</pre></div>
+ <div class="grid"><div class="card"><h2>Document syntax</h2><pre>Dog is a mammal.            (is-a)
+Penguin is not a fish.      (negation)
+Bird can fly. / Penguin cannot fly.
+Mammal has fur.
+The capital of France is Paris.
+Paris is the capital of France.
+Mars has a diameter of 6779 km.
+@relation orbits | also: orbit
+@relation is part of | transitive
+@relation parent of | inverse: child of
+@scale diameter | larger, largest | smaller, smallest
+@closed     (absent facts are false)
+If ?x is a bird then ?x can lay eggs.
+If ?x eats ?y and ?y is a fish then ?x is a carnivore.</pre></div>
+ <div class="card"><h2>Question patterns</h2><pre>Is X a Y? · Can X do Z? · Does X have Z?
+What is the R of X? · What is X's R?
+What/Who &lt;relation&gt; Y? · Which &lt;class&gt; &lt;relation&gt; Y?
+What does X &lt;relation&gt;? · Is X &lt;relation&gt; Y?
+Is X larger than Y? · Which &lt;class&gt; has the largest R?
+What is the largest &lt;class&gt;?
+List all &lt;class&gt;s · How many &lt;class&gt;s are there?
+How is X related to Y? · What is X?
+Why …?  (same as the question; proof always shown)</pre></div></div>
+ <div class="card"><h2>Evaluation criteria</h2><p>Exact-match accuracy, precision / recall / F1 over answer sets, coverage (share of questions answered rather than “unknown”), abstention accuracy (unanswerable questions correctly answered “unknown”), and average response time.</p></div>
+</section></main>
+<script src="engine.js"></script><script src="samples.js"></script><script src="app.js"></script></body></html>
